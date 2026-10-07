@@ -1,0 +1,916 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>习惯打卡</title>
+<style>
+  :root {
+    --canvas: #edf1f7;
+    --surface: #ffffff;
+    --surface-soft: #f7f9fc;
+    --ink: #101828;
+    --ink-soft: #475467;
+    --muted: #98a2b3;
+    --line: #e4e7ec;
+    --line-strong: #d0d5dd;
+    --brand: #1d4ed8;
+    --brand-deep: #0b1f4e;
+    --brand-mid: #2563eb;
+    --brand-light: #7db2ff;
+    --brand-pale: #eaf2ff;
+    --done-bg: #f5f7fa;
+    --done-text: #a3adbb;
+    --danger: #d92d20;
+    --success: #12b76a;
+    --shadow: 0 24px 70px rgba(16, 24, 40, 0.14), 0 4px 14px rgba(16, 24, 40, 0.05);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    min-height: 100%;
+  }
+
+  body {
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    color: var(--ink);
+    background-color: var(--canvas);
+    background-image:
+      linear-gradient(rgba(15, 23, 42, 0.032) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.032) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-attachment: fixed;
+    font-family: "Aptos", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+    line-height: 1.5;
+    letter-spacing: 0.005em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgba(37, 99, 235, 0.16);
+  }
+
+  .app {
+    width: min(100% - 32px, 560px);
+    margin: 0 auto;
+    padding: 44px 0 64px;
+  }
+
+  .card {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid rgba(208, 213, 221, 0.88);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  .hero {
+    padding: 26px 26px 24px;
+  }
+
+  .brand {
+    position: relative;
+    overflow: hidden;
+    margin: -26px -26px 24px;
+    padding: 29px 28px 32px;
+    color: #ffffff;
+    background: linear-gradient(125deg, #081a43 0%, #123da8 52%, #3b82f6 100%);
+    border-radius: 24px 24px 0 0;
+  }
+
+  .brand::before,
+  .brand::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .brand::before {
+    width: 170px;
+    height: 170px;
+    right: -62px;
+    top: -82px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 0 18px rgba(255, 255, 255, 0.035), 0 0 0 42px rgba(255, 255, 255, 0.025);
+  }
+
+  .brand::after {
+    width: 88px;
+    height: 88px;
+    right: 28px;
+    bottom: -58px;
+    background: rgba(125, 178, 255, 0.28);
+    filter: blur(1px);
+  }
+
+  .brand h1 {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    font-family: "Aptos Display", "Segoe UI Variable Display", "SF Pro Display", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  .week-plan {
+    margin-bottom: 24px;
+    padding: 14px 16px 16px;
+    background: linear-gradient(180deg, #f5f8ff 0%, #fbfdff 100%);
+    border: 1px solid #dfe9fb;
+    border-radius: 16px;
+  }
+
+  .week-plan-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 11px;
+  }
+
+  .week-plan-label {
+    color: var(--ink-soft);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .week-plan-percent {
+    padding: 2px 8px 3px;
+    color: var(--brand);
+    background: #ffffff;
+    border: 1px solid #dbe7fb;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .week-plan .progress-track {
+    margin-top: 0;
+  }
+
+  .date {
+    margin: 0 0 12px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .summary-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .summary-text {
+    color: var(--ink-soft);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .summary-text strong {
+    display: inline-block;
+    margin: 0 4px;
+    color: var(--brand-deep);
+    font-family: "Aptos Display", "Segoe UI Variable Display", "SF Pro Display", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+    font-size: 46px;
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 0.9;
+    vertical-align: -2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .progress-track {
+    height: 8px;
+    margin-top: 20px;
+    overflow: hidden;
+    background: #e8edf5;
+    border-radius: 999px;
+  }
+
+  .progress-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--brand-mid) 0%, var(--brand-light) 100%);
+    box-shadow: 0 0 16px rgba(37, 99, 235, 0.20);
+    transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .composer {
+    display: flex;
+    gap: 10px;
+    padding: 18px 22px;
+    background: var(--surface-soft);
+    border-top: 1px solid var(--line);
+  }
+
+  .composer input {
+    flex: 1;
+    min-width: 0;
+    height: 48px;
+    padding: 0 16px;
+    color: var(--ink);
+    background: #ffffff;
+    border: 1px solid var(--line-strong);
+    border-radius: 13px;
+    font: inherit;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .composer input::placeholder {
+    color: #98a2b3;
+  }
+
+  .composer input:hover {
+    border-color: #b8c1ce;
+  }
+
+  .composer input:focus {
+    border-color: var(--brand-mid);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  }
+
+  .btn {
+    height: 48px;
+    padding: 0 20px;
+    border: 0;
+    border-radius: 13px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.08s ease, background 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .btn:active {
+    transform: translateY(1px);
+  }
+
+  .btn-primary {
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-mid) 100%);
+    box-shadow: 0 8px 18px rgba(29, 78, 216, 0.20);
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+    box-shadow: 0 10px 22px rgba(29, 78, 216, 0.28);
+  }
+
+  .btn:focus-visible,
+  .icon-btn:focus-visible {
+    outline: 2px solid var(--brand-mid);
+    outline-offset: 2px;
+  }
+
+  .hint {
+    padding: 10px 22px;
+    color: var(--danger);
+    background: #fff6f5;
+    border-top: 1px solid #fee4e2;
+    font-size: 12px;
+  }
+
+  .habit-list {
+    margin: 0;
+    padding: 8px 12px 14px;
+    list-style: none;
+  }
+
+  .habit-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 60px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    border-radius: 12px;
+    transition: background 0.18s ease, opacity 0.18s ease;
+  }
+
+  .habit-item:last-child {
+    border-bottom: 0;
+  }
+
+  .habit-item:hover {
+    background: #f9fafb;
+  }
+
+  .habit-item.done {
+    background: var(--done-bg);
+    border-bottom-color: #eef0f3;
+  }
+
+  .habit-label {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: 13px;
+    padding: 7px 0;
+    cursor: pointer;
+  }
+
+  .habit-checkbox {
+    position: relative;
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: #ffffff;
+    border: 1.5px solid #c6ced9;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  }
+
+  .habit-checkbox:hover {
+    border-color: #9aa7b8;
+  }
+
+  .habit-checkbox:checked {
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-light) 100%);
+    border-color: transparent;
+  }
+
+  .habit-checkbox:checked::after {
+    content: "";
+    position: absolute;
+    left: 7px;
+    top: 3px;
+    width: 5px;
+    height: 10px;
+    border: solid #ffffff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .habit-checkbox:focus-visible {
+    outline: 2px solid var(--brand-mid);
+    outline-offset: 2px;
+  }
+
+  .habit-name {
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 500;
+    word-break: break-word;
+    transition: color 0.18s ease;
+  }
+
+  .habit-item.done .habit-name {
+    color: var(--done-text);
+    text-decoration: line-through;
+    text-decoration-color: #c7ced8;
+    text-decoration-thickness: 1px;
+  }
+
+  .habit-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 2px;
+    opacity: 0.6;
+    transition: opacity 0.18s ease;
+  }
+
+  .habit-item:hover .habit-actions,
+  .habit-item:focus-within .habit-actions {
+    opacity: 1;
+  }
+
+  .icon-btn {
+    padding: 8px 9px;
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    border-radius: 9px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.18s ease, background 0.18s ease;
+  }
+
+  .icon-btn:hover {
+    color: var(--ink-soft);
+    background: #eef1f5;
+  }
+
+  .icon-btn.danger:hover {
+    color: var(--danger);
+    background: #fff1f0;
+  }
+
+  .empty {
+    padding: 52px 24px 58px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .empty .emoji {
+    display: block;
+    margin-bottom: 14px;
+    font-size: 42px;
+    filter: grayscale(0.2);
+  }
+
+  .empty h2 {
+    margin: 0 0 8px;
+    color: var(--ink);
+    font-family: "Aptos Display", "Segoe UI Variable Display", "SF Pro Display", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .empty p {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    z-index: 10;
+    padding: 11px 18px;
+    color: #ffffff;
+    background: rgba(8, 26, 67, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 999px;
+    box-shadow: 0 12px 30px rgba(8, 26, 67, 0.22);
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(18px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @media (max-width: 480px) {
+    .app {
+      width: min(100% - 20px, 560px);
+      padding: 16px 0 40px;
+    }
+
+    .card {
+      border-radius: 20px;
+    }
+
+    .hero {
+      padding: 20px 18px 20px;
+    }
+
+    .brand {
+      margin: -20px -18px 20px;
+      padding: 24px 20px 26px;
+      border-radius: 20px 20px 0 0;
+    }
+
+    .brand h1 {
+      font-size: 26px;
+    }
+
+    .summary-text strong {
+      font-size: 40px;
+    }
+
+    .composer {
+      padding: 14px 14px;
+    }
+
+    .habit-list {
+      padding: 6px 8px 10px;
+    }
+
+    .habit-item {
+      padding: 8px;
+    }
+
+    .habit-actions {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+</style>
+</head>
+<body>
+  <main class="app">
+    <section class="card">
+      <header class="hero">
+        <div class="brand">
+          <h1>习惯打卡</h1>
+        </div>
+        <div class="week-plan">
+          <div class="week-plan-head">
+            <span class="week-plan-label">本周完成计划</span>
+            <span class="week-plan-percent" id="weekPercent">0%</span>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div class="progress-fill" id="weekProgressFill"></div>
+          </div>
+        </div>
+        <p class="date" id="dateText"></p>
+        <div class="summary-row">
+          <div class="summary-text">今日完成 <strong id="doneCount">0</strong> / <span id="totalCount">0</span> 项</div>
+        </div>
+        <div class="progress-track" aria-hidden="true">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </header>
+
+      <form class="composer" id="addForm">
+        <input id="habitInput" type="text" placeholder="添加一个想坚持的习惯，如：喝水" maxlength="30" autocomplete="off">
+        <button class="btn btn-primary" type="submit">添加</button>
+      </form>
+
+      <div class="hint" id="hint" hidden></div>
+
+      <ul class="habit-list" id="habitList"></ul>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var HABITS_KEY = 'habits';
+  var LOGS_KEY = 'habitLogs';
+
+  var habitListEl = document.getElementById('habitList');
+  var addFormEl = document.getElementById('addForm');
+  var habitInputEl = document.getElementById('habitInput');
+  var dateTextEl = document.getElementById('dateText');
+  var doneCountEl = document.getElementById('doneCount');
+  var totalCountEl = document.getElementById('totalCount');
+  var progressFillEl = document.getElementById('progressFill');
+  var weekProgressFillEl = document.getElementById('weekProgressFill');
+  var weekPercentEl = document.getElementById('weekPercent');
+  var hintEl = document.getElementById('hint');
+  var toastEl = document.getElementById('toast');
+
+  var toastTimer = null;
+
+  function readJSON(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function writeJSON(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (err) {
+      showToast('无法保存数据，请检查浏览器存储设置');
+      return false;
+    }
+  }
+
+  function loadHabits() {
+    var habits = readJSON(HABITS_KEY, []);
+    if (!Array.isArray(habits)) {
+      habits = [];
+    }
+    return habits.filter(function (h) {
+      return h && typeof h.id === 'string' && typeof h.name === 'string';
+    });
+  }
+
+  function saveHabits(habits) {
+    writeJSON(HABITS_KEY, habits);
+  }
+
+  function loadLogs() {
+    var logs = readJSON(LOGS_KEY, {});
+    if (!logs || typeof logs !== 'object' || Array.isArray(logs)) {
+      logs = {};
+    }
+    return logs;
+  }
+
+  function saveLogs(logs) {
+    writeJSON(LOGS_KEY, logs);
+  }
+
+  function makeId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'h_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  }
+
+  function pad(n) {
+    return n < 10 ? '0' + n : String(n);
+  }
+
+  function dateKey(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  function todayKey() {
+    return dateKey(new Date());
+  }
+
+  function currentWeekKeys() {
+    var now = new Date();
+    var day = now.getDay();
+    var mondayOffset = day === 0 ? -6 : 1 - day;
+    var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+    var keys = [];
+    for (var i = 0; i < 7; i += 1) {
+      keys.push(dateKey(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i)));
+    }
+    return keys;
+  }
+
+  function formatDate() {
+    var now = new Date();
+    return now.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long'
+    });
+  }
+
+  function showToast(message) {
+    toastEl.textContent = message;
+    toastEl.classList.add('show');
+    if (toastTimer) {
+      clearTimeout(toastTimer);
+    }
+    toastTimer = setTimeout(function () {
+      toastEl.classList.remove('show');
+    }, 2200);
+  }
+
+  function showHint(message) {
+    hintEl.textContent = message;
+    hintEl.hidden = !message;
+  }
+
+  function clearHint() {
+    showHint('');
+  }
+
+  function render() {
+    var habits = loadHabits();
+    var logs = loadLogs();
+    var today = todayKey();
+    var todayLog = logs[today] && typeof logs[today] === 'object' ? logs[today] : {};
+    var doneCount = 0;
+
+    dateTextEl.textContent = formatDate();
+    totalCountEl.textContent = String(habits.length);
+
+    var habitIdSet = {};
+    habits.forEach(function (h) { habitIdSet[h.id] = true; });
+
+    var weekKeys = currentWeekKeys();
+    var weekDone = 0;
+    weekKeys.forEach(function (dayKey) {
+      var dayLog = logs[dayKey] && typeof logs[dayKey] === 'object' ? logs[dayKey] : {};
+      Object.keys(dayLog).forEach(function (id) {
+        if (habitIdSet[id] && dayLog[id] === true) {
+          weekDone += 1;
+        }
+      });
+    });
+
+    var weekTarget = habits.length * 7;
+    var weekPercent = weekTarget > 0 ? Math.round((weekDone / weekTarget) * 100) : 0;
+    weekProgressFillEl.style.width = weekPercent + '%';
+    weekPercentEl.textContent = weekPercent + '%';
+
+    habitListEl.innerHTML = '';
+
+    if (habits.length === 0) {
+      var emptyEl = document.createElement('li');
+      emptyEl.className = 'empty';
+      emptyEl.innerHTML = '<span class="emoji">🎯</span><h2>还没有习惯</h2><p>先添加一个想坚持的小习惯吧</p>';
+      habitListEl.appendChild(emptyEl);
+    } else {
+      habits.forEach(function (habit) {
+        var isDone = todayLog[habit.id] === true;
+        if (isDone) {
+          doneCount += 1;
+        }
+
+        var itemEl = document.createElement('li');
+        itemEl.className = 'habit-item' + (isDone ? ' done' : '');
+
+        var labelEl = document.createElement('label');
+        labelEl.className = 'habit-label';
+
+        var checkboxEl = document.createElement('input');
+        checkboxEl.type = 'checkbox';
+        checkboxEl.className = 'habit-checkbox';
+        checkboxEl.checked = isDone;
+        checkboxEl.setAttribute('aria-label', habit.name);
+        checkboxEl.addEventListener('change', function () {
+          toggleHabit(habit.id, checkboxEl.checked);
+        });
+
+        var nameEl = document.createElement('span');
+        nameEl.className = 'habit-name';
+        nameEl.textContent = habit.name;
+
+        labelEl.appendChild(checkboxEl);
+        labelEl.appendChild(nameEl);
+
+        var actionsEl = document.createElement('div');
+        actionsEl.className = 'habit-actions';
+
+        var editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'icon-btn';
+        editBtn.textContent = '编辑';
+        editBtn.addEventListener('click', function () {
+          editHabit(habit.id);
+        });
+
+        var deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'icon-btn danger';
+        deleteBtn.textContent = '删除';
+        deleteBtn.addEventListener('click', function () {
+          deleteHabit(habit.id);
+        });
+
+        actionsEl.appendChild(editBtn);
+        actionsEl.appendChild(deleteBtn);
+
+        itemEl.appendChild(labelEl);
+        itemEl.appendChild(actionsEl);
+        habitListEl.appendChild(itemEl);
+      });
+    }
+
+    doneCountEl.textContent = String(doneCount);
+
+    var percent = habits.length > 0 ? Math.round((doneCount / habits.length) * 100) : 0;
+    progressFillEl.style.width = percent + '%';
+  }
+
+  function addHabit(name) {
+    name = name.trim();
+    clearHint();
+
+    if (!name) {
+      showHint('请输入习惯名称');
+      habitInputEl.focus();
+      return;
+    }
+
+    var habits = loadHabits();
+    var isDuplicate = habits.some(function (h) {
+      return h.name.toLowerCase() === name.toLowerCase();
+    });
+
+    habits.push({
+      id: makeId(),
+      name: name,
+      createdAt: new Date().toISOString(),
+      order: habits.length
+    });
+
+    saveHabits(habits);
+    habitInputEl.value = '';
+    habitInputEl.focus();
+    render();
+
+    if (isDuplicate) {
+      showToast('已添加（存在同名习惯）');
+    }
+  }
+
+  function toggleHabit(id, checked) {
+    var logs = loadLogs();
+    var today = todayKey();
+
+    if (!logs[today] || typeof logs[today] !== 'object') {
+      logs[today] = {};
+    }
+
+    if (checked) {
+      logs[today][id] = true;
+    } else {
+      delete logs[today][id];
+      if (Object.keys(logs[today]).length === 0) {
+        delete logs[today];
+      }
+    }
+
+    saveLogs(logs);
+    render();
+  }
+
+  function editHabit(id) {
+    var habits = loadHabits();
+    var habit = habits.find(function (h) { return h.id === id; });
+    if (!habit) {
+      return;
+    }
+
+    var newName = window.prompt('修改习惯名称', habit.name);
+    if (newName === null) {
+      return;
+    }
+
+    newName = newName.trim();
+    if (!newName) {
+      showToast('名称不能为空');
+      return;
+    }
+
+    habit.name = newName;
+    saveHabits(habits);
+    render();
+  }
+
+  function deleteHabit(id) {
+    var habits = loadHabits();
+    var habit = habits.find(function (h) { return h.id === id; });
+    if (!habit) {
+      return;
+    }
+
+    if (!window.confirm('确定删除“' + habit.name + '”吗？该习惯的历史打卡记录也会被清理。')) {
+      return;
+    }
+
+    var remaining = habits.filter(function (h) { return h.id !== id; });
+    saveHabits(remaining);
+
+    var logs = loadLogs();
+    Object.keys(logs).forEach(function (dateKey) {
+      if (logs[dateKey] && typeof logs[dateKey] === 'object' && logs[dateKey][id] !== undefined) {
+        delete logs[dateKey][id];
+        if (Object.keys(logs[dateKey]).length === 0) {
+          delete logs[dateKey];
+        }
+      }
+    });
+    saveLogs(logs);
+
+    render();
+  }
+
+  addFormEl.addEventListener('submit', function (event) {
+    event.preventDefault();
+    addHabit(habitInputEl.value);
+  });
+
+  habitInputEl.addEventListener('input', function () {
+    if (hintEl.textContent) {
+      clearHint();
+    }
+  });
+
+  window.addEventListener('focus', render);
+  window.setInterval(render, 60000);
+
+  render();
+})();
+</script>
+</body>
+</html>
