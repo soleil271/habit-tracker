@@ -160,12 +160,82 @@
     margin-top: 0;
   }
 
-  .date {
-    margin: 0 0 12px;
-    color: var(--muted);
+  .date-nav {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 36px auto;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .date-nav-btn,
+  .today-btn,
+  .date-input {
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font: inherit;
+    outline: none;
+  }
+
+  .date-nav-btn {
+    width: 36px;
+    padding: 0;
+    color: var(--ink-soft);
+    background: #ffffff;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  }
+
+  .date-nav-btn:hover:not(:disabled) {
+    color: var(--brand);
+    background: #f5f8ff;
+    border-color: #cbdcff;
+  }
+
+  .date-nav-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+
+  .date-input {
+    min-width: 0;
+    width: 100%;
+    padding: 0 10px;
+    color: var(--ink);
+    background: #ffffff;
     font-size: 13px;
     font-weight: 600;
-    letter-spacing: 0.01em;
+    text-align: center;
+  }
+
+  .date-input:focus {
+    border-color: var(--brand-mid);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+
+  .today-btn {
+    padding: 0 12px;
+    color: var(--brand);
+    background: #f5f8ff;
+    border-color: #dbe7fb;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease;
+  }
+
+  .today-btn:hover {
+    background: var(--brand-pale);
+    border-color: #cbdcff;
+  }
+
+  .history-note {
+    margin: -2px 0 12px;
+    color: var(--muted);
+    font-size: 12px;
   }
 
   .summary-row {
@@ -329,6 +399,10 @@
     cursor: pointer;
   }
 
+  .habit-label.read-only {
+    cursor: default;
+  }
+
   .habit-checkbox {
     position: relative;
     flex: 0 0 auto;
@@ -368,6 +442,11 @@
   .habit-checkbox:focus-visible {
     outline: 2px solid var(--brand-mid);
     outline-offset: 2px;
+  }
+
+  .habit-checkbox:disabled {
+    cursor: default;
+    opacity: 1;
   }
 
   .habit-name {
@@ -494,6 +573,15 @@
       font-size: 26px;
     }
 
+    .date-nav {
+      grid-template-columns: 34px minmax(0, 1fr) 34px;
+    }
+
+    .today-btn {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+
     .summary-text strong {
       font-size: 40px;
     }
@@ -536,16 +624,22 @@
         </div>
         <div class="week-plan">
           <div class="week-plan-head">
-            <span class="week-plan-label">本周完成计划</span>
+            <span class="week-plan-label" id="weekPlanLabel">本周完成计划</span>
             <span class="week-plan-percent" id="weekPercent">0%</span>
           </div>
           <div class="progress-track" aria-hidden="true">
             <div class="progress-fill" id="weekProgressFill"></div>
           </div>
         </div>
-        <p class="date" id="dateText"></p>
+        <div class="date-nav">
+          <button class="date-nav-btn" id="prevDateBtn" type="button" aria-label="前一天">‹</button>
+          <input class="date-input" id="datePicker" type="date">
+          <button class="date-nav-btn" id="nextDateBtn" type="button" aria-label="后一天">›</button>
+          <button class="today-btn" id="todayBtn" type="button">今天</button>
+        </div>
+        <div class="history-note" id="historyNote" hidden>历史记录仅查看</div>
         <div class="summary-row">
-          <div class="summary-text">今日完成 <strong id="doneCount">0</strong> / <span id="totalCount">0</span> 项</div>
+          <div class="summary-text"><span id="summaryLabel">今日完成</span> <strong id="doneCount">0</strong> / <span id="totalCount">0</span> 项</div>
         </div>
         <div class="progress-track" aria-hidden="true">
           <div class="progress-fill" id="progressFill"></div>
@@ -575,7 +669,13 @@
   var habitListEl = document.getElementById('habitList');
   var addFormEl = document.getElementById('addForm');
   var habitInputEl = document.getElementById('habitInput');
-  var dateTextEl = document.getElementById('dateText');
+  var datePickerEl = document.getElementById('datePicker');
+  var prevDateBtnEl = document.getElementById('prevDateBtn');
+  var nextDateBtnEl = document.getElementById('nextDateBtn');
+  var todayBtnEl = document.getElementById('todayBtn');
+  var weekPlanLabelEl = document.getElementById('weekPlanLabel');
+  var summaryLabelEl = document.getElementById('summaryLabel');
+  var historyNoteEl = document.getElementById('historyNote');
   var doneCountEl = document.getElementById('doneCount');
   var totalCountEl = document.getElementById('totalCount');
   var progressFillEl = document.getElementById('progressFill');
@@ -584,6 +684,7 @@
   var hintEl = document.getElementById('hint');
   var toastEl = document.getElementById('toast');
 
+  var viewDate = null;
   var toastTimer = null;
 
   function readJSON(key, fallback) {
@@ -650,26 +751,38 @@
     return dateKey(new Date());
   }
 
-  function currentWeekKeys() {
-    var now = new Date();
-    var day = now.getDay();
+  function parseDateKey(key) {
+    var parts = String(key).split('-');
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+
+  function shiftDateKey(key, amount) {
+    var date = parseDateKey(key);
+    date.setDate(date.getDate() + amount);
+    return dateKey(date);
+  }
+
+  function habitExistsOn(habit, dayKey) {
+    if (!habit.createdAt) {
+      return true;
+    }
+    var created = new Date(habit.createdAt);
+    if (isNaN(created.getTime())) {
+      return true;
+    }
+    return dateKey(created) <= dayKey;
+  }
+
+  function getWeekKeys(baseKey) {
+    var base = parseDateKey(baseKey || todayKey());
+    var day = base.getDay();
     var mondayOffset = day === 0 ? -6 : 1 - day;
-    var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+    var monday = new Date(base.getFullYear(), base.getMonth(), base.getDate() + mondayOffset);
     var keys = [];
     for (var i = 0; i < 7; i += 1) {
       keys.push(dateKey(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i)));
     }
     return keys;
-  }
-
-  function formatDate() {
-    var now = new Date();
-    return now.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
   }
 
   function showToast(message) {
@@ -693,58 +806,84 @@
   }
 
   function render() {
+    var today = todayKey();
+    if (!viewDate || viewDate > today) {
+      viewDate = today;
+    }
+
     var habits = loadHabits();
     var logs = loadLogs();
-    var today = todayKey();
-    var todayLog = logs[today] && typeof logs[today] === 'object' ? logs[today] : {};
+    var isViewingToday = viewDate === today;
+    var viewLog = logs[viewDate] && typeof logs[viewDate] === 'object' ? logs[viewDate] : {};
+    var visibleHabits = habits.filter(function (habit) {
+      return habitExistsOn(habit, viewDate);
+    });
     var doneCount = 0;
 
-    dateTextEl.textContent = formatDate();
-    totalCountEl.textContent = String(habits.length);
+    datePickerEl.value = viewDate;
+    datePickerEl.max = today;
+    nextDateBtnEl.disabled = isViewingToday;
+    summaryLabelEl.textContent = isViewingToday ? '今日完成' : '当日完成';
+    historyNoteEl.hidden = isViewingToday;
+    totalCountEl.textContent = String(visibleHabits.length);
 
-    var habitIdSet = {};
-    habits.forEach(function (h) { habitIdSet[h.id] = true; });
+    var weekKeys = getWeekKeys(viewDate);
+    var todayWeekKeys = getWeekKeys(today);
+    weekPlanLabelEl.textContent = weekKeys[0] === todayWeekKeys[0] ? '本周完成计划' : '当周完成计划';
 
-    var weekKeys = currentWeekKeys();
     var weekDone = 0;
+    var weekTarget = 0;
     weekKeys.forEach(function (dayKey) {
+      var dayHabits = habits.filter(function (habit) {
+        return habitExistsOn(habit, dayKey);
+      });
+      var dayHabitIds = {};
+      dayHabits.forEach(function (habit) {
+        dayHabitIds[habit.id] = true;
+      });
+      weekTarget += dayHabits.length;
+
       var dayLog = logs[dayKey] && typeof logs[dayKey] === 'object' ? logs[dayKey] : {};
       Object.keys(dayLog).forEach(function (id) {
-        if (habitIdSet[id] && dayLog[id] === true) {
+        if (dayHabitIds[id] && dayLog[id] === true) {
           weekDone += 1;
         }
       });
     });
 
-    var weekTarget = habits.length * 7;
     var weekPercent = weekTarget > 0 ? Math.round((weekDone / weekTarget) * 100) : 0;
     weekProgressFillEl.style.width = weekPercent + '%';
     weekPercentEl.textContent = weekPercent + '%';
 
     habitListEl.innerHTML = '';
 
-    if (habits.length === 0) {
+    if (visibleHabits.length === 0) {
       var emptyEl = document.createElement('li');
       emptyEl.className = 'empty';
-      emptyEl.innerHTML = '<span class="emoji">🎯</span><h2>还没有习惯</h2><p>先添加一个想坚持的小习惯吧</p>';
+      if (habits.length === 0) {
+        emptyEl.innerHTML = '<span class="emoji">🎯</span><h2>还没有习惯</h2><p>先添加一个想坚持的小习惯吧</p>';
+      } else {
+        emptyEl.innerHTML = '<span class="emoji">🗓️</span><h2>这一天没有习惯</h2><p>当时还没有添加习惯</p>';
+      }
       habitListEl.appendChild(emptyEl);
     } else {
-      habits.forEach(function (habit) {
-        var isDone = todayLog[habit.id] === true;
+      visibleHabits.forEach(function (habit) {
+        var isDone = viewLog[habit.id] === true;
         if (isDone) {
           doneCount += 1;
         }
 
         var itemEl = document.createElement('li');
-        itemEl.className = 'habit-item' + (isDone ? ' done' : '');
+        itemEl.className = 'habit-item' + (isDone ? ' done' : '') + (isViewingToday ? '' : ' history');
 
         var labelEl = document.createElement('label');
-        labelEl.className = 'habit-label';
+        labelEl.className = 'habit-label' + (isViewingToday ? '' : ' read-only');
 
         var checkboxEl = document.createElement('input');
         checkboxEl.type = 'checkbox';
         checkboxEl.className = 'habit-checkbox';
         checkboxEl.checked = isDone;
+        checkboxEl.disabled = !isViewingToday;
         checkboxEl.setAttribute('aria-label', habit.name);
         checkboxEl.addEventListener('change', function () {
           toggleHabit(habit.id, checkboxEl.checked);
@@ -787,7 +926,7 @@
 
     doneCountEl.textContent = String(doneCount);
 
-    var percent = habits.length > 0 ? Math.round((doneCount / habits.length) * 100) : 0;
+    var percent = visibleHabits.length > 0 ? Math.round((doneCount / visibleHabits.length) * 100) : 0;
     progressFillEl.style.width = percent + '%';
   }
 
@@ -802,6 +941,7 @@
     }
 
     var habits = loadHabits();
+    var wasViewingHistory = viewDate !== todayKey();
     var isDuplicate = habits.some(function (h) {
       return h.name.toLowerCase() === name.toLowerCase();
     });
@@ -816,27 +956,37 @@
     saveHabits(habits);
     habitInputEl.value = '';
     habitInputEl.focus();
+    if (wasViewingHistory) {
+      viewDate = todayKey();
+    }
     render();
 
     if (isDuplicate) {
       showToast('已添加（存在同名习惯）');
+    } else if (wasViewingHistory) {
+      showToast('已返回今天');
     }
   }
 
   function toggleHabit(id, checked) {
-    var logs = loadLogs();
     var today = todayKey();
+    if (viewDate !== today) {
+      return;
+    }
 
-    if (!logs[today] || typeof logs[today] !== 'object') {
-      logs[today] = {};
+    var logs = loadLogs();
+    var targetDate = viewDate;
+
+    if (!logs[targetDate] || typeof logs[targetDate] !== 'object') {
+      logs[targetDate] = {};
     }
 
     if (checked) {
-      logs[today][id] = true;
+      logs[targetDate][id] = true;
     } else {
-      delete logs[today][id];
-      if (Object.keys(logs[today]).length === 0) {
-        delete logs[today];
+      delete logs[targetDate][id];
+      if (Object.keys(logs[targetDate]).length === 0) {
+        delete logs[targetDate];
       }
     }
 
@@ -906,9 +1056,37 @@
     }
   });
 
+  prevDateBtnEl.addEventListener('click', function () {
+    viewDate = shiftDateKey(viewDate || todayKey(), -1);
+    render();
+  });
+
+  nextDateBtnEl.addEventListener('click', function () {
+    var nextDate = shiftDateKey(viewDate || todayKey(), 1);
+    var today = todayKey();
+    viewDate = nextDate > today ? today : nextDate;
+    render();
+  });
+
+  todayBtnEl.addEventListener('click', function () {
+    viewDate = todayKey();
+    render();
+  });
+
+  datePickerEl.addEventListener('change', function () {
+    var selected = datePickerEl.value;
+    if (!selected) {
+      return;
+    }
+    var today = todayKey();
+    viewDate = selected > today ? today : selected;
+    render();
+  });
+
   window.addEventListener('focus', render);
   window.setInterval(render, 60000);
 
+  viewDate = todayKey();
   render();
 })();
 </script>
